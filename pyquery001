@@ -1,0 +1,149 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov  1 16:10:02 2017
+
+@author: Administrator
+"""
+
+from urllib import request
+from pyquery import PyQuery as pq
+import pandas as pd
+
+import mssql1
+
+def GetHtml(num):
+    url = 'http://vip.stock.finance.sina.com.cn/q/go.php/vInvestConsult/kind/qgqp/index.phtml?p='+str(num)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36',
+        'Host': 'vip.stock.finance.sina.com.cn'
+    }
+#    dict = {
+#        'name': 'zhaofan'
+#    }
+#    data = bytes(parse.urlencode(dict), encoding='GB2312')
+    req = request.Request(url=url, data=None, headers=headers, method='POST')
+    response = request.urlopen(req)
+    html=response.read().decode('GB2312')  
+    return html
+#print(response.read().decode('GB2312'))
+
+
+def GetText(stock,df,html):
+    doc = pq(html)
+    
+    print(type(doc))
+    
+    table=doc('table')
+#    listtr=table.find('tr')
+    
+    tr=table('tr').items()
+    #print(type(tr))
+#    stock={'stockcode': '', 'stockname': '', 'comment': '', 'latestprice': '', 'riseandfall': '', 'priceriseandfall': '', 'yesterdayprice': '', 'todayprice': '', 'Highest': '', 'minimum': '', 'volume': '', 'Turnover': ''}
+#    df=pd.DataFrame(stock,index=['0'])
+     
+    index=0
+    
+    for tr1 in tr:
+        
+        #print(type(tr1))
+        #print(tr1)
+        index =index+1
+        if(index >1):
+            stock['stockcode'] = tr1.find('td').eq(0).text()   #股票代码
+            stock['stockname'] = tr1.find('td').eq(1).text()    #股票名称
+            stock['comment'] = tr1.find('td').eq(2).text()       #千股千评
+            stock['latestprice'] = tr1.find('td').eq(3).text()    #最新价	 
+            stock['riseandfall'] = tr1.find('td').eq(4).text()    #涨跌额
+            stock['priceriseandfall'] = tr1.find('td').eq(5).text()   #涨跌幅
+            stock['yesterdayprice'] = tr1.find('td').eq(6).text()        #昨收
+            stock['todayprice'] = tr1.find('td').eq(7).text()        #今开
+            stock['highest'] = tr1.find('td').eq(8).text()       #最高
+            stock['minimum'] = tr1.find('td').eq(9).text()       #最低
+            stock['volume'] = tr1.find('td').eq(10).text()        #成交量(万股)
+            stock['turnover'] = tr1.find('td').eq(11).text()      #成交额(万元)  
+            #print(stock)
+            save('t_stock',stock)
+            
+            
+            #df1=pd.DataFrame(stock)
+            df1=pd.DataFrame.from_dict(stock,orient='index').T
+            df=df.append(df1, ignore_index=True)
+            print(df1)            
+        print('-------------------------------')
+    return df
+def dict_2_str(dictin):
+    '''
+    将字典变成，key='value',key='value' 的形式
+    '''
+    tmplist = []
+    for k, v in dictin.items():
+        tmp = "%s='%s'" % (str(k), str(v))
+        tmplist.append(' ' + tmp + ' ')
+    return ','.join(tmplist)
+
+
+
+def get_dict_keys(dictin):
+    #list_keys=list(dictin.keys())
+    insert='('
+    for k,v in dictin.items(): 
+       tmp = "%s," % (str(k))
+       insert +=tmp
+    
+    insert=insert[:-1]+')'   
+    return insert
+
+def get_dict_values(dictin):
+    values='('
+    for k,v in dictin.items(): 
+       tmp = "'%s',"% (str(v))
+       values +=tmp
+    
+    values=values[:-1]+')'   
+    return values            
+    
+    
+    
+def save(table,stock):
+    '''
+    生成insert的sql语句
+    @table，插入记录的表名
+    @dict,插入的数据，字典
+    '''
+    field=get_dict_keys(stock)
+    values=get_dict_values(stock)
+    
+#    print(field)
+#    print(values)
+    
+    
+    
+    sql = 'insert into %s %s VALUES %s ' % (table,field,values)
+    print(sql)
+
+    ms = mssql1.MSSQL(host="192.168.3.37",user="sa",pwd="@zhu1981427530",db="test")
+    ms.ExecNonQuery(sql)
+    return stock.keys() 
+        
+def main():
+    num = 0
+    stock={'stockcode': '', 'stockname': '', 'comment': '', 'latestprice': '', 'riseandfall': '', 'priceriseandfall': '', 'yesterdayprice': '', 'todayprice': '', 'highest': '', 'minimum': '', 'volume': '', 'turnover': ''}
+    df=pd.DataFrame(stock,index=['0'])
+    while (num <= 33):     
+        num += 1
+        html=GetHtml(num)
+        df=GetText(stock,df,html)
+    print(df)  
+    df.to_html('D:\\a.html')
+
+
+    ms = mssql1.MSSQL(host="192.168.3.37",user="sa",pwd="@zhu1981427530",db="test")
+    resList = ms.ExecQuery("select *  from t_user")
+#    
+    print(resList)
+if __name__ == "__main__":
+    main()
+
+        
+        
+        
